@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with points ledger",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique ID of the user" },
+        "displayName": { "type": "string", "description": "Display name of the user" },
+        "email": { "type": "string", "format": "email", "description": "Email address of the user" },
+        "photoURL": { "type": "string", "description": "URL of user photo/avatar" },
+        "points": { "type": "integer", "description": "Total balance of points available to the user" },
+        "createdAt": { "type": "integer", "description": "Timestamp of user creation" }
+      },
+      "required": ["uid", "displayName", "email", "photoURL", "points", "createdAt"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "YouTube promotion campaign made by creators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique campaign ID" },
+        "creatorId": { "type": "string", "description": "UID of campaign creator" },
+        "creatorEmail": { "type": "string", "description": "Email of campaign creator" },
+        "type": { "type": "string", "enum": ["view", "like", "subscribe"], "description": "Type of promotion" },
+        "youtubeUrl": { "type": "string", "description": "YouTube URL of standard format" },
+        "youtubeId": { "type": "string", "description": "Parsed YouTube video/channel ID" },
+        "title": { "type": "string", "description": "Title of the video or channel" },
+        "duration": { "type": "integer", "description": "Duration required to watch" },
+        "pointsPerAction": { "type": "integer", "description": "The cost deducted from creator per interaction" },
+        "rewardPerAction": { "type": "integer", "description": "The reward points given to the worker" },
+        "quantity": { "type": "integer", "description": "Total target action count" },
+        "completedCount": { "type": "integer", "description": "Number of successfully done actions" },
+        "status": { "type": "string", "enum": ["active", "paused", "completed"], "description": "Current state" },
+        "createdAt": { "type": "integer", "description": "Timestamp of create action" }
+      },
+      "required": ["id", "creatorId", "creatorEmail", "type", "youtubeUrl", "youtubeId", "title", "duration", "pointsPerAction", "rewardPerAction", "quantity", "completedCount", "status", "createdAt"]
+    },
+    "ActionHistory": {
+      "title": "ActionHistory",
+      "description": "Log of interactions/completions done by workers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique key matching userId_campaignId" },
+        "userId": { "type": "string", "description": "UID of worker who completed action" },
+        "campaignId": { "type": "string", "description": "Campaign ID being interacted with" },
+        "type": { "type": "string", "enum": ["view", "like", "subscribe"], "description": "Action type" },
+        "pointsEarned": { "type": "integer", "description": "Points credited to the worker" },
+        "createdAt": { "type": "integer", "description": "Timestamp" }
+      },
+      "required": ["id", "userId", "campaignId", "type", "pointsEarned", "createdAt"]
+    },
+    "CryptoPayment": {
+      "title": "CryptoPayment",
+      "description": "Blockchain cryptocurrency deposit request waiting for approval",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique deposit purchase ID" },
+        "userId": { "type": "string", "description": "UID of deposit/buyer" },
+        "userEmail": { "type": "string", "description": "Email of buyer" },
+        "cryptoCurrency": { "type": "string", "description": "Currency abbreviation (e.g. BTC, ETH)" },
+        "packagePrice": { "type": "number", "description": "The package dollar price paid" },
+        "packagePoints": { "type": "integer", "description": "Total coins in package to be added" },
+        "transactionHash": { "type": "string", "description": "Transaction TxHash on public blockchain network" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Request status" },
+        "createdAt": { "type": "integer", "description": "Timestamp" }
+      },
+      "required": ["id", "userId", "userEmail", "cryptoCurrency", "packagePrice", "packagePoints", "transactionHash", "status", "createdAt"]
+    },
+    "AdminSettings": {
+      "title": "AdminSettings",
+      "description": "Receiving wallets addresses configuration",
+      "type": "object",
+      "properties": {
+        "btcAddress": { "type": "string", "description": "BTC deposit wallet address" },
+        "ethAddress": { "type": "string", "description": "ETH deposit wallet address" },
+        "dogeAddress": { "type": "string", "description": "Doge deposit wallet address" },
+        "trxAddress": { "type": "string", "description": "TRX deposit wallet address" },
+        "usdtAddress": { "type": "string", "description": "USDT deposit wallet address with protocol" }
+      },
+      "required": ["btcAddress", "ethAddress", "dogeAddress", "trxAddress", "usdtAddress"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles indexed by UID"
+    },
+    "campaigns/{campaignId}": {
+      "schema": "Campaign",
+      "description": "Marketing campaigns indexed by random ID"
+    },
+    "history/{historyId}": {
+      "schema": "ActionHistory",
+      "description": "User completion logs to prevent duplicates"
+    },
+    "payments/{paymentId}": {
+      "schema": "CryptoPayment",
+      "description": "Deposits requests sent by members"
+    },
+    "settings/{settingsId}": {
+      "schema": "AdminSettings",
+      "description": "System settings including wallets configurations"
+    }
+  }
+}

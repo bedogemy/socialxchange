@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cairo:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Scale all font sizes up globally (~15-20% boost) for optimal legibility of Cairo (Arabic) */
+  --font-size-xs: 0.85rem;      /* 13.6px (originally 12px) - makes compact text noticeably clearer */
+  --font-size-sm: 0.95rem;      /* 15.2px (originally 14px) - highly legible UI labels */
+  --font-size-base: 1.1rem;     /* 17.6px (originally 16px) - robust body copy */
+  --font-size-lg: 1.25rem;      /* 20px (originally 18px) - elegant subtitle text */
+  --font-size-xl: 1.45rem;      /* 23.2px (originally 20px) - small heading text */
+  --font-size-2xl: 1.75rem;     /* 28px (originally 24px) - secondary headings */
+  --font-size-3xl: 2.15rem;     /* 34.4px (originally 30px) - sections titles */
+  --font-size-4xl: 2.75rem;     /* 44px (originally 36px) - prominent title */
+  --font-size-5xl: 3.5rem;      /* 56px (originally 48px) - hero banner headings */
+  --font-size-6xl: 4.5rem;      /* 72px (originally 60px) - super display sizes */
+  --font-size-7xl: 5.5rem;      /* 88px (originally 72px) */
+}
+
+/* Global typography systems tuned for high-legibility Cairo (Arabic) */
+html {
+  font-size: 18px !important;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 1.1rem; /* Larger base font size for Cairo */
+  font-weight: 500; /* Enforce font-medium by default as requested */
+  line-height: 1.85; /* Taller line-height for double diacritics */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+p, span, li, label, input, select, textarea, button {
+  font-family: var(--font-sans);
+  /* Optimize line height, word spacing and weights for Arabic scripts */
+  word-spacing: 0.04em;
+}
+
+input, select, textarea {
+  line-height: 1.6;
+}
+
+button {
+  font-weight: 700 !important; /* Make action text pop */
+}
+
+/* Premium styled scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #030712;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e1b4b;
+  border-radius: 9999px;
+  border: 2px solid #030712;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #312e81;
+}

@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Is the user authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Is the authenticated user verified (Optional verification, fallback to true if not populated)
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    // Validate generic ID length and characters
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Check if user is the administrator of the system
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.email == 'bedogemy20144@gmail.com' || request.auth.token.email == 'admin@ytsocial.com' || request.auth.token.email == 'thelegendgamer2022@gmail.com');
+    }
+
+    // USERS COLLECTION
+    // users/{userId}
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // CAMPAIGNS COLLECTION
+    // campaigns/{campaignId}
+    match /campaigns/{campaignId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // HISTORY LOGS (for action completions)
+    // history/{historyId}
+    match /history/{historyId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // DEPOSIT REQUESTS
+    // payments/{paymentId}
+    match /payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ADMIN CONFIGURATIONS
+    // settings/{settingsId}
+    match /settings/{settingsId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // REVIEWS COLLECTION
+    // reviews/{reviewId}
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // COMPLAINTS COLLECTION
+    // complaints/{complaintId}
+    match /complaints/{complaintId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ADS COLLECTION
+    // ads/{adId}
+    match /ads/{adId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // WITHDRAWALS COLLECTION
+    // withdrawals/{withdrawalId}
+    match /withdrawals/{withdrawalId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // VERIFICATIONS COLLECTION
+    // verifications/{verificationId}
+    match /verifications/{verificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // GLOBAL PLATFORM STATS (Counters)
+    match /global_stats/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

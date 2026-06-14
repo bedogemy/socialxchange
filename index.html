@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SocialXchange - منصة تبادل التفاعل الاجتماعي</title>
+    <style>
+      /* Base premium style settings for immediate loading states */
+      body {
+        background-color: #030712 !important;
+        color: #f8fafc;
+        min-height: 100vh;
+        margin: 0;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      /* Premium dynamic backdrop network layout */
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -2;
+        background: 
+          /* Fine Digital grid dots representing connected social nodes */
+          radial-gradient(rgba(99, 102, 241, 0.12) 1.2px, transparent 1.2px) 0 0 / 32px 32px,
+          /* Fluid premium mesh gradient glows of social brand colors (indigo, purple, cyan, rose) */
+          radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.16) 0%, transparent 45%),
+          radial-gradient(circle at 90% 15%, rgba(236, 72, 153, 0.14) 0%, transparent 45%),
+          radial-gradient(circle at 50% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 80% 85%, rgba(20, 184, 166, 0.12) 0%, transparent 40%);
+        pointer-events: none;
+        animation: bgPulseAnimation 25s ease-in-out infinite alternate;
+      }
+
+      @keyframes bgPulseAnimation {
+        0% {
+          background-position: 0px 0px, 10% 20%, 90% 15%, 50% 80%, 80% 85%;
+        }
+        50% {
+          background-position: 16px 16px, 15% 25%, 85% 10%, 45% 75%, 75% 90%;
+        }
+        100% {
+          background-position: -16px -16px, 5% 15%, 95% 20%, 55% 85%, 85% 80%;
+        }
+      }
+
+      /* Abstract Networking grid lines layer representing connected lines mapping */
+      body::after {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        opacity: 0.15;
+        pointer-events: none;
+        background-image: 
+          linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+        background-size: 128px 128px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

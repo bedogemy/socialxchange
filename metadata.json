@@ -1,0 +1,6 @@
+{
+  "name": "SocialXchange",
+  "description": "منصة تبادل التفاعلات الاجتماعية والزيارات والمشاهدات بطرق مأمنة وحقيقية 100% لزيادة نمو حساباتك وقنواتك.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
