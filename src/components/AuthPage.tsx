@@ -968,14 +968,17 @@ export default function AuthPage({ onLoginSuccess, defaultToAdmin = false, lang 
           }
         }
 
-        let userObj = db.getUser(fireUser.uid);
+        let userObj = await db.syncUserWithCloud(fireUser.uid);
+        if (!userObj) {
+          userObj = db.getUser(fireUser.uid);
+        }
         if (!userObj) {
           const allUsers = db.getUsers();
           const existingAdmin = allUsers.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
           if (existingAdmin) {
             userObj = existingAdmin;
           } else {
-            userObj = db.registerGoogleUser(
+            userObj = await db.registerGoogleUser(
               fireUser.uid,
               'المدير العام (The Legend)',
               targetEmail
@@ -1050,11 +1053,14 @@ export default function AuthPage({ onLoginSuccess, defaultToAdmin = false, lang 
           }
         }
 
-        const userObj = db.registerGoogleUser(
-          fireUser.uid,
-          displayName.trim(),
-          fireUser.email || targetEmail
-        );
+        let userObj = await db.syncUserWithCloud(fireUser.uid);
+        if (!userObj) {
+          userObj = await db.registerGoogleUser(
+            fireUser.uid,
+            displayName.trim(),
+            fireUser.email || targetEmail
+          );
+        }
 
         userObj.passwordText = password;
         db.updateUserProfile(userObj);
@@ -1091,9 +1097,12 @@ export default function AuthPage({ onLoginSuccess, defaultToAdmin = false, lang 
           }
         }
 
-        let userObj = db.getUser(fireUser.uid);
+        let userObj = await db.syncUserWithCloud(fireUser.uid);
         if (!userObj) {
-          userObj = db.registerGoogleUser(
+          userObj = db.getUser(fireUser.uid);
+        }
+        if (!userObj) {
+          userObj = await db.registerGoogleUser(
             fireUser.uid,
             fireUser.displayName || 'مشترك جديد',
             fireUser.email || targetEmail

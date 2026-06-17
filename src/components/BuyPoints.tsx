@@ -752,7 +752,7 @@ export default function BuyPoints({ user, onPaymentSubmitted, lang = 'en' }: Buy
                   <div className="mt-3 p-3 bg-slate-950 border border-emerald-500/30 rounded-2xl flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="relative w-16 h-16 rounded-xl border border-slate-800 overflow-hidden bg-slate-900 flex-shrink-0">
-                        <img src={screenshotFile} alt="Receipt proof preview" className="w-full h-full object-cover" />
+                        <img loading="lazy" src={screenshotFile} alt="Receipt proof preview" className="w-full h-full object-cover" />
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold text-white">

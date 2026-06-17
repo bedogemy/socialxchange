@@ -849,31 +849,18 @@ export default function CreateCampaign({ user, onCampaignCreated, lang = 'en' }:
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">{t.targetQty}</label>
-                  <input
-                    id="camp-qty-input"
-                    type="number"
-                    min="25"
-                    step="5"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 0))}
-                    className={`w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:border-red-500 focus:ring-1 focus:ring-red-500 text-xs outline-none transition ${activeLang === 'ar' ? 'text-right' : 'text-left'}`}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">{t.rewardLabel}</label>
-                  <div className="w-full px-4 py-3 bg-slate-950 border border-slate-850 rounded-xl text-slate-350 text-xs pointer-events-none text-center font-bold">
-                    {type === 'view' ? t.viewReward : 
-                     type === 'subscribe' ? t.subReward : 
-                     (type === 'like' || type === 'fb_like' || type === 'ig_like' || type === 'tiktok_like') ? t.likeReward : 
-                     (type === 'fb_follow' || type === 'ig_follow' || type === 'tiktok_follow') ? t.followReward : 
-                     t.actionReward}: <span className="text-emerald-400 font-extrabold">{rewardPerAction} {t.ptsSuffix}</span>
-                  </div>
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-2">{t.targetQty}</label>
+                <input
+                  id="camp-qty-input"
+                  type="number"
+                  min="25"
+                  step="5"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 0))}
+                  className={`w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:border-red-500 focus:ring-1 focus:ring-red-500 text-xs outline-none transition ${activeLang === 'ar' ? 'text-right' : 'text-left'}`}
+                  required
+                />
               </div>
             </div>
 

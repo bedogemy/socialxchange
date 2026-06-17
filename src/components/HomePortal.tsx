@@ -634,6 +634,7 @@ export default function HomePortal({ user, onSelectTab, lang = 'en' }: HomePorta
           
           <div className={`flex items-center gap-3.5 pb-4 border-b border-slate-900 ${isRtl ? 'flex-row-reverse' : 'flex-row'}`}>
             <img 
+              loading="lazy"
               src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop'} 
               alt={user.displayName} 
               className="w-12 h-12 rounded-full border border-slate-800 bg-slate-900 shadow-md shadow-indigo-500/5 object-cover"

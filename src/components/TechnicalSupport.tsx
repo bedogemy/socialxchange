@@ -501,6 +501,7 @@ export default function TechnicalSupport({ user, lang = 'en' }: TechnicalSupport
                     <div className="flex items-center justify-between flex-row">
                       <div className="flex items-center gap-2.5 flex-row">
                         <img 
+                          loading="lazy"
                           src={rev.userPhotoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(rev.displayName)}`}
                           alt={rev.displayName}
                           className="w-8 h-8 rounded-full bg-slate-800 border border-indigo-500/10"

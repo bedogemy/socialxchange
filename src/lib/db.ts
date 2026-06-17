@@ -1,7 +1,7 @@
 import { User, Campaign, ActionHistory, CryptoPayment, AdminSettings, Advertisement, CampaignType, UserReview, UserComplaint, WithdrawalRequest, TaskVerification } from '../types';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase
@@ -962,6 +962,28 @@ export const db = {
     return this.getUsers().find(u => u.uid === uid);
   },
 
+  async syncUserWithCloud(uid: string): Promise<User | null> {
+    try {
+      const docRef = doc(firestoreDb, 'users', uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const cloudUser = snap.data() as User;
+        const users = this.getUsers();
+        const idx = users.findIndex(u => u.uid === uid);
+        if (idx !== -1) {
+          users[idx] = { ...users[idx], ...cloudUser };
+        } else {
+          users.push(cloudUser);
+        }
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        return cloudUser;
+      }
+    } catch (e) {
+      console.warn("syncUserWithCloud error:", e);
+    }
+    return null;
+  },
+
   getCurrentUser(): User | null {
     this.initialize();
     const uid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
@@ -1006,7 +1028,27 @@ export const db = {
     return newUser;
   },
 
-  registerGoogleUser(uid: string, displayName: string, email: string, photoURL?: string): User {
+  async registerGoogleUser(uid: string, displayName: string, email: string, photoURL?: string): Promise<User> {
+    // Check cloud database first to prevent overwriting an existing user's data!
+    try {
+      const docRef = doc(firestoreDb, 'users', uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const cloudUser = snap.data() as User;
+        const users = this.getUsers();
+        const idx = users.findIndex(u => u.uid === uid);
+        if (idx !== -1) {
+          users[idx] = { ...users[idx], ...cloudUser };
+        } else {
+          users.push(cloudUser);
+        }
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        return cloudUser;
+      }
+    } catch (e) {
+      console.warn("Cloud check in registerGoogleUser failed or was denied:", e);
+    }
+
     const users = this.getUsers();
     let existing = users.find(u => u.uid === uid || u.email.toLowerCase() === email.toLowerCase());
     
@@ -1424,10 +1466,16 @@ export const db = {
         }
       });
     }
+    if (settings.customPlatforms) {
+      settings.customPlatforms = settings.customPlatforms.filter(p => p.id !== 'custom_mqar8ytj');
+    }
     return settings;
   },
 
   saveAdminSettings(settings: AdminSettings) {
+    if (settings.customPlatforms) {
+      settings.customPlatforms = settings.customPlatforms.filter(p => p.id !== 'custom_mqar8ytj');
+    }
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
 
     // Async push to settings/admin mapping

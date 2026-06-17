@@ -521,6 +521,215 @@ async function startServer() {
     return res.json(platformsList);
   });
 
+    // Local Emulation for Netlify Function: auth.js
+  app.post('/.netlify/functions/auth', async (req, res) => {
+    try {
+      const { action, email, password, displayName, userId } = req.body;
+
+      const targetEmail = (email || '').toLowerCase().trim();
+      if (!targetEmail) {
+        return res.status(400).json({ error: 'العنوان البريدي مطلوب.' });
+      }
+
+      const targetUserId = userId || `vanilla_${targetEmail}`;
+
+      // Dynamic load firebase configurations
+      const fs = await import('fs');
+      const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+      const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+      const { initializeApp: serverInitApp, getApp: serverGetApp } = await import('firebase/app');
+      const { getFirestore: serverGetFirestore, doc: serverDoc, getDoc: serverGetDoc, setDoc: serverSetDoc } = await import('firebase/firestore');
+
+      let fbApp;
+      try {
+        fbApp = serverGetApp('server-auth');
+      } catch (e) {
+        fbApp = serverInitApp(firebaseConfig, 'server-auth');
+      }
+      const firestoreDb = serverGetFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+
+      const userDocRef = serverDoc(firestoreDb, 'users', targetUserId);
+      const userDocSnapshot = await serverGetDoc(userDocRef);
+
+      if (userDocSnapshot.exists()) {
+        const userData = userDocSnapshot.data();
+        if (action === 'login' || !action) {
+          // Check password if developer passed one and user has password
+          if (password && userData?.password && userData.password !== password) {
+            return res.status(401).json({ error: 'كلمة المرور المدخلة غير صحيحة.' });
+          }
+        }
+
+        return res.json({
+          success: true,
+          message: 'تم تسجيل الدخول أو استرداد البيانات بنجاح.',
+          user: {
+            email: userData?.email || targetEmail,
+            displayName: userData?.displayName || targetEmail.split('@')[0],
+            points: typeof userData?.points === 'number' ? userData.points : 1000
+          }
+        });
+      } else {
+        if (action === 'login') {
+          return res.status(404).json({ error: 'هذا البريد الإلكتروني غير مسجل. يرجى إنشاء حساب جديد أولاً.' });
+        }
+
+        const defaultPoints = 1000;
+        const newUser = {
+          email: targetEmail,
+          displayName: (displayName || targetEmail.split('@')[0]).trim(),
+          password: password || '123456',
+          points: defaultPoints,
+          createdAt: Date.now()
+        };
+
+        await serverSetDoc(userDocRef, newUser);
+
+        return res.status(201).json({
+          success: true,
+          message: 'تم تسجيل الحساب بنجاح وتم منحك 1000 نقطة ترحيبية!',
+          user: {
+            email: newUser.email,
+            displayName: newUser.displayName,
+            points: newUser.points
+          }
+        });
+      }
+
+    } catch (err: any) {
+      console.error('Error in local auth simulation:', err);
+      return res.status(500).json({ error: 'فشل معالجة المصادقة: ' + err.message });
+    }
+  });
+
+  // Local Emulation for Netlify Function: login.js
+  app.post('/.netlify/functions/login', async (req, res) => {
+    try {
+      const { userId, email } = req.body;
+
+      const targetEmail = (email || '').toLowerCase().trim();
+      if (!targetEmail) {
+        return res.status(400).json({ error: 'العنوان البريدي مطلوب.' });
+      }
+
+      const targetUserId = userId || `vanilla_${targetEmail}`;
+
+      // Dynamic load firebase configurations
+      const fs = await import('fs');
+      const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+      const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+      const { initializeApp: serverInitApp, getApp: serverGetApp } = await import('firebase/app');
+      const { getFirestore: serverGetFirestore, doc: serverDoc, getDoc: serverGetDoc, setDoc: serverSetDoc } = await import('firebase/firestore');
+
+      let fbApp;
+      try {
+        fbApp = serverGetApp('server-login');
+      } catch (e) {
+        fbApp = serverInitApp(firebaseConfig, 'server-login');
+      }
+      const firestoreDb = serverGetFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+
+      const userDocRef = serverDoc(firestoreDb, 'users', targetUserId);
+      const userDocSnapshot = await serverGetDoc(userDocRef);
+
+      if (userDocSnapshot.exists()) {
+        const userData = userDocSnapshot.data();
+        return res.json({
+          message: "Login successful",
+          user: {
+            ...userData,
+            email: userData?.email || targetEmail,
+            points: typeof userData?.points === 'number' ? userData.points : 1000
+          }
+        });
+      } else {
+        const newUser = {
+          email: targetEmail,
+          displayName: targetEmail.split('@')[0],
+          points: 1000,
+          createdAt: new Date().toISOString()
+        };
+
+        await serverSetDoc(userDocRef, newUser);
+
+        return res.status(201).json({
+          message: "User created",
+          user: newUser
+        });
+      }
+
+    } catch (err: any) {
+      console.error('Error in local login simulation:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Local Emulation for Netlify Function: transaction.js
+  app.post('/.netlify/functions/transaction', async (req, res) => {
+    try {
+      const { email, serviceId, cost } = req.body;
+
+      if (!email || !serviceId || cost === undefined || cost <= 0) {
+        return res.status(400).json({ error: 'بيانات الطلب غير مكتملة أو غير صالحة.' });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Dynamic load firebase configurations
+      const fs = await import('fs');
+      const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+      const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+      const { initializeApp: serverInitApp, getApp: serverGetApp } = await import('firebase/app');
+      const { getFirestore: serverGetFirestore, doc: serverDoc, getDoc: serverGetDoc, setDoc: serverSetDoc } = await import('firebase/firestore');
+
+      let fbApp;
+      try {
+        fbApp = serverGetApp('server-transaction');
+      } catch (e) {
+        fbApp = serverInitApp(firebaseConfig, 'server-transaction');
+      }
+      const firestoreDb = serverGetFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+
+      const userDocRef = serverDoc(firestoreDb, 'users', `vanilla_${normalizedEmail}`);
+      const userSnapshot = await serverGetDoc(userDocRef);
+
+      if (!userSnapshot.exists()) {
+        return res.status(404).json({ error: 'المستخدم غير موجود بقاعدة البيانات.' });
+      }
+
+      const userData = userSnapshot.data();
+      const currentPoints = userData?.points || 0;
+
+      if (currentPoints < cost) {
+        return res.status(400).json({
+          error: `عذراً، رصيدك غير كافٍ. تحتاج إلى ${cost} نقطة بينما رصيدك الحالي هو ${currentPoints} نقطة.`,
+          currentPoints
+        });
+      }
+
+      const remainingPoints = currentPoints - cost;
+      const updatedUser = {
+        ...userData,
+        points: remainingPoints
+      };
+
+      await serverSetDoc(userDocRef, updatedUser);
+
+      return res.json({
+        success: true,
+        message: `تم تنفيذ خدمة "${serviceId}" بنجاح! تم خصم ${cost} نقطة.`,
+        newPoints: remainingPoints
+      });
+
+    } catch (err: any) {
+      console.error('Error in local transaction simulation:', err);
+      return res.status(500).json({ error: 'حدث خطأ غير متوقع أثناء معالجة العملية: ' + err.message });
+    }
+  });
+
   // Serve Vite in development, static files in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

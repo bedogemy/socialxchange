@@ -1,12 +1,83 @@
 # netlify.toml
-# Settings for Netlify deployment and SPA routing fallback
+# Settings for high-performance Netlify deployment, aggressive caching, and SPA routing fallback
 
 [build]
   publish = "dist"
   command = "npm run build"
   functions = "netlify/functions"
 
+# Default SPA redirect rule to fallback to index.html for React SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Headless redirect rule for Vanilla JS SPA (if hosted or accessed under /vanilla)
+[[redirects]]
+  from = "/vanilla/*"
+  to = "/vanilla/index.html"
+  status = 200
+
+# Aggressive Caching Rules for Maximum Initial Load Speed (0ms secondary requests)
+# Rules for HTML files: Always validate to prevent stale layouts or stale client logic
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+
+[[headers]]
+  for = "/vanilla/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+
+# Rules for long-term immutable assets: CSS, JS, Fonts, and Images
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/vanilla/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.woff"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.woff2"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/vanilla/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

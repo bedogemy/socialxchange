@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SocialXchange - Vanilla JS Edition</title>
+
+  <!-- Preconnect to external servers to accelerate connection setup (DNS lookups + TCP + TLS) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://firestore.googleapis.com">
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+
+  <!-- DNS Prefetch as fallback for older browsers -->
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+  <link rel="dns-prefetch" href="https://unpkg.com">
+  <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+  <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+  <!-- Preload Critical JS files so they download in parallel while rendering the shell -->
+  <link rel="preload" href="./router.js" as="script" crossorigin="anonymous">
+  <link rel="preload" href="./dashboard.js" as="script" crossorigin="anonymous">
+  <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for gorgeous typography (Inter & Cairo for Arabic support) -->
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest" defer></script>
+  
+  <style>
+    body {
+      font-family: 'Cairo', 'Inter', sans-serif;
+      background-color: #030712 !important;
+      color: #f8fafc;
+      min-height: 100vh;
+      margin: 0;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Premium dynamic backdrop network layout matching main application style */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background: 
+        radial-gradient(rgba(99, 102, 241, 0.12) 1.2px, transparent 1.2px) 0 0 / 32px 32px,
+        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.16) 0%, transparent 45%),
+        radial-gradient(circle at 90% 15%, rgba(236, 72, 153, 0.14) 0%, transparent 45%),
+        radial-gradient(circle at 50% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 85%, rgba(20, 184, 166, 0.12) 0%, transparent 40%);
+      pointer-events: none;
+      animation: bgPulseAnimation 25s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgPulseAnimation {
+      0% {
+        background-position: 0px 0px, 10% 20%, 90% 15%, 50% 80%, 80% 85%;
+      }
+      50% {
+        background-position: 16px 16px, 15% 25%, 85% 10%, 45% 75%, 75% 90%;
+      }
+      100% {
+        background-position: -16px -16px, 5% 15%, 95% 20%, 55% 85%, 85% 80%;
+      }
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      opacity: 0.15;
+      pointer-events: none;
+      background-image: 
+        linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+      background-size: 128px 128px;
+    }
+
+    /* Beautiful fade-in transition animation */
+    .fade-in {
+      animation: fadeInEffect 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes fadeInEffect {
+      from { opacity: 0; transform: translateY(12px) scale(0.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Beautiful fade-out transition animation */
+    .fade-out {
+      animation: fadeOutEffect 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes fadeOutEffect {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(-12px) scale(0.99); }
+    }
+
+    /* Skeleton Loading Pulsing Style */
+    .skeleton-glow {
+      background: linear-gradient(90deg, #0f172a 25%, #1e293b 50%, #0f172a 75%);
+      background-size: 200% 100%;
+      animation: skeletonShine 1.5s infinite linear;
+    }
+    @keyframes skeletonShine {
+      to {
+        background-position-x: -200%;
+      }
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+  <!-- Main Navigation Bar -->
+  <header class="border-b border-indigo-550/15 bg-slate-950/45 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-2 space-x-reverse cursor-pointer" onclick="window.router.navigate('/dashboard')">
+        <div class="bg-gradient-to-tr from-indigo-500 to-purple-500 p-2 rounded-xl shadow-lg ring-1 ring-white/10">
+          <i data-lucide="sparkles" class="w-6 h-6 text-white animate-pulse"></i>
+        </div>
+        <span class="text-lg font-black text-white tracking-wider flex items-center gap-1">
+          Social<span class="text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-lg border border-indigo-500/20 text-xs">Vanilla SPA</span>
+        </span>
+      </div>
+      
+      <!-- Safe Dynamic Header Balance Indicator -->
+      <div id="nav-user-container" class="hidden items-center gap-4">
+        <div class="flex items-center gap-1.5 bg-slate-900/80 border border-slate-800 rounded-xl px-3.5 py-1.5 shadow-inner">
+          <span class="text-xs text-slate-400 font-medium">الرصيد:</span>
+          <span id="nav-points" class="text-amber-500 font-black font-mono tracking-tight text-sm">---</span>
+          <span class="text-[10px] text-amber-500/85 font-black uppercase">نقطة</span>
+        </div>
+        
+        <button id="nav-logout" class="flex items-center gap-1 px-3 py-1.5 text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/10 rounded-xl transition-all duration-200">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span>خروج</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mounting Container -->
+  <main id="app" class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+    <!-- Premium glowing skeleton loader of the dashboard to satisfy initial load aesthetics -->
+    <div class="space-y-8 animate-pulse text-right" dir="rtl">
+      <!-- Welcome Bar Skeleton -->
+      <div class="sm:flex sm:items-center sm:justify-between bg-slate-900/40 p-6 rounded-2xl border border-slate-800/40">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-slate-800 skeleton-glow animate-pulse"></div>
+          <div class="space-y-2">
+            <div class="h-4 w-32 bg-slate-800 rounded skeleton-glow"></div>
+            <div class="h-3 w-48 bg-slate-800 rounded skeleton-glow"></div>
+          </div>
+        </div>
+        <div class="h-8 w-32 bg-slate-800 rounded-xl mt-4 sm:mt-0 skeleton-glow"></div>
+      </div>
+
+      <!-- Points and Analytics Info Grid Skeletons -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-slate-900/40 p-8 rounded-3xl border border-slate-800/40 min-h-[220px] flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="h-3.5 w-28 bg-slate-800 rounded skeleton-glow"></div>
+            <div class="h-4 w-20 bg-slate-800 rounded skeleton-glow"></div>
+          </div>
+          <div class="space-y-2">
+            <div class="h-9 w-40 bg-slate-800 rounded skeleton-glow"></div>
+          </div>
+          <div class="h-3 w-32 bg-slate-800 rounded skeleton-glow"></div>
+        </div>
+
+        <div class="md:col-span-2 bg-slate-900/40 border border-slate-800/40 p-6 rounded-3xl flex flex-col justify-between">
+          <div class="space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-slate-800 skeleton-glow"></div>
+              <div class="h-4.5 w-40 bg-slate-800 rounded skeleton-glow"></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="h-10 bg-slate-800/45 rounded-xl skeleton-glow"></div>
+              <div class="h-10 bg-slate-800/45 rounded-xl skeleton-glow"></div>
+            </div>
+          </div>
+          <div class="h-10 w-48 bg-slate-800 rounded-xl self-end mt-4 skeleton-glow"></div>
+        </div>
+      </div>
+
+      <!-- Services grid Skeletons -->
+      <div class="space-y-4">
+        <div class="h-5 w-48 bg-slate-800 rounded skeleton-glow"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
+          <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
+          <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
+          <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 bg-slate-950/30 mt-auto py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:flex sm:justify-between sm:items-center text-xs text-zinc-500 font-medium">
+      <p>&copy; 2026 SocialXchange Vanilla Edition. جميع الحقوق محفوظة.</p>
+      <p class="mt-2 sm:mt-0 flex items-center justify-center gap-1">
+        بيئة حماية رصيد النقاط <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500"></i> نشطة وآمنة بنسبة 100%.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Load Modules using type="module" -->
+  <script type="module" src="./login.js"></script>
+  <script type="module" src="./dashboard.js"></script>
+  <script type="module" src="./control-room.js"></script>
+  <!-- Load router last, linking our view modules -->
+  <script type="module" src="./router.js"></script>
+
+  <!-- Service Worker Instant Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then((registration) => {
+            console.log('[App] Service Worker successfully registered on scope:', registration.scope);
+          })
+          .catch((error) => {
+            console.error('[App] Service Worker registration failed:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>

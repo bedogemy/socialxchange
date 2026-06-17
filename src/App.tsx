@@ -264,10 +264,35 @@ export default function App() {
       const pathTab = getTabFromPath(window.location.pathname);
       if (pathTab) {
         setActiveTab(pathTab);
+        setRefreshTrigger(prev => prev + 1); // Auto-fetch latest data on back/forward
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Global link interception listener to prevent full page reloads and handle them in client DOM
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchorNode = target.closest('a');
+      if (anchorNode) {
+        const href = anchorNode.getAttribute('href');
+        // Handle internal navigation cleanly
+        if (href && (href.startsWith('/') || href.startsWith(window.location.origin))) {
+          const relativePath = href.startsWith('/') ? href : href.substring(window.location.origin.length);
+          const matchedTab = getTabFromPath(relativePath);
+          if (matchedTab) {
+            e.preventDefault();
+            window.history.pushState({ tab: matchedTab }, '', relativePath);
+            setActiveTab(matchedTab);
+            setRefreshTrigger(prev => prev + 1); // Trigger automatic latest data retrieval
+          }
+        }
+      }
+    };
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
   }, []);
 
   // Update window path and custom Meta Tags according to the active tab configuration
@@ -286,6 +311,7 @@ export default function App() {
     }
 
     localStorage.setItem('ytsocial_active_tab', activeTab);
+    setRefreshTrigger(prev => prev + 1); // Always trigger automatic data fetch upon entry to a section
 
     // Dynmically inject or update Meta Title and Description for supreme SEO & SSR simulated experiences
     let activeRoute = Object.values(routesMap).find(r => r.tab === activeTab);
@@ -309,6 +335,20 @@ export default function App() {
   }, [activeTab]);
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Sync current stabilized user state into localStorage for immediate loading next time (Caching)
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('cached_user_profile', JSON.stringify({
+        uid: currentUser.uid,
+        displayName: currentUser.displayName,
+        email: currentUser.email,
+        photoURL: currentUser.photoURL,
+        points: currentUser.points,
+        dollars: currentUser.dollars || 0
+      }));
+    }
+  }, [currentUser]);
   const [adminLoginPrefill, setAdminLoginPrefill] = useState<boolean>(false);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [lang, setLang] = useState<SupportedLanguages>(() => {
@@ -349,6 +389,7 @@ export default function App() {
               إعلان رعاة
             </span>
             <img
+              loading="lazy"
               referrerPolicy="no-referrer"
               src={ad.imageUrl}
               alt={ad.title}
@@ -374,22 +415,29 @@ export default function App() {
     db.initialize();
     
     // Wire up standard onAuthStateChanged observer to sync with current user state
-    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        // Find existing user locally or register them
-        const localUser = db.getUser(firebaseUser.uid);
-        if (localUser) {
-          setCurrentUser(localUser);
-          db.setCurrentUser(firebaseUser.uid);
+        setIsAuthLoading(true);
+        // Ensure we load/sync from cloud first so we don't assume 1000 or overwrite
+        let syncedUser = await db.syncUserWithCloud(firebaseUser.uid);
+        if (syncedUser) {
+          setCurrentUser(syncedUser);
+          db.setCurrentUser(syncedUser.uid);
         } else {
-          const userObj = db.registerGoogleUser(
-            firebaseUser.uid,
-            firebaseUser.displayName || 'Google User',
-            firebaseUser.email || '',
-            firebaseUser.photoURL || undefined
-          );
-          setCurrentUser(userObj);
-          db.setCurrentUser(userObj.uid);
+          const localUser = db.getUser(firebaseUser.uid);
+          if (localUser) {
+            setCurrentUser(localUser);
+            db.setCurrentUser(firebaseUser.uid);
+          } else {
+            const userObj = await db.registerGoogleUser(
+              firebaseUser.uid,
+              firebaseUser.displayName || 'Google User',
+              firebaseUser.email || '',
+              firebaseUser.photoURL || undefined
+            );
+            setCurrentUser(userObj);
+            db.setCurrentUser(userObj.uid);
+          }
         }
       } else {
         setCurrentUser(null);
@@ -504,14 +552,77 @@ export default function App() {
 
   // Render loading state during initial Firebase session detection to avoid login screen flashing
   if (isAuthLoading) {
+    let cachedUser: any = null;
+    try {
+      const saved = localStorage.getItem('cached_user_profile');
+      if (saved) cachedUser = JSON.parse(saved);
+    } catch (_) {}
+
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-200">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs font-bold text-slate-400 font-sans">
-            {lang === 'ar' ? 'تحميل بيانات الحساب... برجاء الانتظار' : 'Loading account details... Please wait'}
-          </p>
-        </div>
+      <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex flex-col md:flex-row-reverse select-none relative animate-pulse">
+        {/* Skeleton Sidebar - Matches native orientation */}
+        <aside className="w-full md:w-72 bg-slate-900 border-b md:border-b-0 md:border-l border-slate-800 flex flex-col shrink-0 text-right">
+          <div className="p-6 flex items-center justify-between md:justify-start gap-4 flex-row-reverse border-b border-slate-800/40">
+            <div className="flex items-center gap-3 flex-row-reverse">
+              <div className="w-10 h-10 bg-slate-800/80 rounded-xl"></div>
+              <div className="h-6 w-32 bg-slate-800/80 rounded"></div>
+            </div>
+          </div>
+          <div className="hidden md:flex flex-col flex-1 px-4 py-6 space-y-2.5">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="h-11 bg-slate-800/40 rounded-xl w-full"></div>
+            ))}
+          </div>
+        </aside>
+
+        {/* Skeleton Main Container */}
+        <main className="flex-1 flex flex-col min-w-0 bg-slate-950">
+          <header className="h-16 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-6 md:px-8 flex-row-reverse text-right">
+            <div className="h-4 w-44 bg-slate-800/80 rounded"></div>
+            
+            <div className="flex items-center gap-4 flex-row-reverse">
+              {/* LEDGER WALLET BADGE SKELETON */}
+              <div className="bg-amber-500/5 border border-amber-500/10 px-4 py-1.5 rounded-full flex items-center gap-2 flex-row-reverse">
+                <span className="text-amber-500/60 font-black tracking-tight text-sm">
+                  {cachedUser ? cachedUser.points.toLocaleString() : '---'}
+                </span>
+                <span className="text-[10px] text-amber-500/40 uppercase tracking-widest font-extrabold">
+                  {lang === 'ar' ? 'نقطة' : 'PTS'}
+                </span>
+              </div>
+
+              {/* USD BALANCE BADGE SKELETON */}
+              <div className="bg-emerald-500/5 border border-emerald-500/10 px-4 py-1.5 rounded-full flex items-center gap-2 flex-row-reverse">
+                <span className="text-emerald-400/60 font-black tracking-tight text-sm">
+                  {cachedUser ? `$${cachedUser.dollars}` : '---'}
+                </span>
+                <span className="text-[10px] text-emerald-400/40 uppercase tracking-widest font-extrabold">
+                  {lang === 'ar' ? 'دولار' : 'USD'}
+                </span>
+              </div>
+            </div>
+          </header>
+
+          {/* SKELETON CARDS LOADING SPACE */}
+          <div className="p-4 md:p-8 flex-1 w-full max-w-7xl mx-auto space-y-6">
+            <div className="h-7 w-48 bg-slate-900 rounded-lg animate-pulse bg-slate-800/50"></div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 h-36 flex flex-col justify-between">
+                  <div className="h-3 w-16 bg-slate-800/60 rounded"></div>
+                  <div className="h-7 w-28 bg-slate-800/60 rounded"></div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 h-56 space-y-4">
+              <div className="h-4 w-32 bg-slate-800/60 rounded"></div>
+              <div className="h-10 bg-slate-800/30 rounded-xl w-full"></div>
+              <div className="h-10 bg-slate-800/30 rounded-xl w-full"></div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -606,6 +717,7 @@ export default function App() {
         <div className="p-4 border-t border-slate-800/80 hidden md:block">
           <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-2xl border border-slate-800 flex-row-reverse text-right">
             <img 
+              loading="lazy"
               src={currentUser.photoURL} 
               alt={currentUser.displayName} 
               className="w-10 h-10 rounded-full bg-slate-800 border border-slate-800"
@@ -774,6 +886,7 @@ export default function App() {
             {/* Mobile-only avatar and user indicators next to head */}
             <div className="flex md:hidden items-center gap-2 select-all text-xs">
               <img 
+                loading="lazy"
                 src={currentUser.photoURL} 
                 alt={currentUser.displayName} 
                 className="w-7 h-7 rounded-full bg-slate-800"
