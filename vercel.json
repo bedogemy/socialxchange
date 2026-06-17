@@ -1,0 +1,37 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/vanilla/assets/:path*",
+      "destination": "/vanilla/assets/:path*"
+    },
+    {
+      "source": "/vanilla/((?!.*\\.).*)",
+      "destination": "/vanilla/index.html"
+    },
+    {
+      "source": "/((?!api/|assets/|vanilla/|.*\\.).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/vanilla/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ]
+}

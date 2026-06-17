@@ -132,6 +132,9 @@ class VanillaRouter {
 
     // Intercept relative link navigations and translate them programmatically
     this.setupIntercepts();
+
+    // Handle initial routing upon script execution / page load (On Load Routing)
+    this.handleRouting();
   }
 
   // Wipe view elements memory
