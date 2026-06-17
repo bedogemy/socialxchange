@@ -1356,6 +1356,22 @@ export const db = {
     // Award points to the user who performed it locally
     this.updateUserPoints(userId, reward);
 
+    // Sync task completion inside the Daily Bonus system safely
+    try {
+      fetch('/.netlify/functions/daily-bonus', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: userId,
+          action: 'complete_task'
+        })
+      }).catch(e => console.error('Silent daily tasks sync fail:', e));
+    } catch (err) {
+      console.error('Daily tasks tracking connection fail:', err);
+    }
+
     // Save interaction log locally
     const history = this.getHistory();
     const newLog: ActionHistory = {

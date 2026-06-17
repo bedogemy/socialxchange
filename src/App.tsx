@@ -26,6 +26,7 @@ import SubscribeTelegram from './components/SubscribeTelegram';
 import SettingsPanel from './components/SettingsPanel';
 import ExchangePanel from './components/ExchangePanel';
 import UserDashboard from './components/UserDashboard';
+import DailyBonusCard from './components/DailyBonusCard';
 import { translations, SupportedLanguages } from './lib/translations';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -40,6 +41,7 @@ import {
   LogOut, 
   User as UserIcon, 
   Award,
+  Gift,
   Share2,
   Shuffle,
   LifeBuoy,
@@ -162,6 +164,11 @@ const routesMap: Record<string, { tab: string; title: string; desc: string }> = 
     tab: 'ad',
     title: 'إطلاق حملة ترويجية جديدة وزيادة التفاعل | SocialXchange',
     desc: 'قم بتمويل وإطلاق حملتك الترويجية لزيادة المتابعين، المشاهدات، واللايكات الحقيقية والآمنة على قنواتك وحساباتك الرقمية.'
+  },
+  '/services/dailybonus': {
+    tab: 'daily_bonus',
+    title: 'المكافأة اليومية المجانية 1000 نقطة | SocialXchange',
+    desc: 'احصل على مكافأتك اليومية المجانية بقيمة 1000 نقطة فوراً عند إتمام 50 مهمة تبادل يومياً.'
   },
   '/services/withdraw': {
     tab: 'exchange',
@@ -503,6 +510,12 @@ export default function App() {
         return <UserDashboard user={currentUser} onSelectTab={setActiveTab} lang={lang} />;
       case 'ad':
         return <CreateCampaign user={currentUser} onCampaignCreated={handlePointChange} lang={lang} />;
+      case 'daily_bonus':
+        return (
+          <div className="p-4 md:p-8 w-full max-w-3xl mx-auto">
+            <DailyBonusCard user={currentUser} onPointsEarned={handlePointChange} lang={lang} />
+          </div>
+        );
       case 'accounts':
         return <LinkAccounts user={currentUser} onSelectTab={setActiveTab} lang={lang} />;
       case 'likes':
@@ -654,6 +667,7 @@ export default function App() {
             { id: 'home', label: lang === 'ar' ? 'الرئيسية' : 'Home', icon: Compass },
             { id: 'accounts', label: lang === 'ar' ? 'ربط ومصادقة الحسابات' : 'Link Accounts', icon: ShieldCheck },
             { id: 'ad', label: translations[lang].tabAd, icon: Sparkles },
+            { id: 'daily_bonus', label: lang === 'ar' ? 'المكافأة اليومية' : lang === 'fr' ? 'Bonus Quotidien' : lang === 'es' ? 'Bono Diario' : 'Daily Bonus', icon: Gift },
             { id: 'website_views', label: translations[lang].tabWebsiteViews, icon: Globe },
             { id: 'views', label: translations[lang].tabViews, icon: Eye },
             { id: 'subs', label: translations[lang].tabSubs, icon: UserPlus },
@@ -758,6 +772,7 @@ export default function App() {
             { id: 'pinterest_like', label: lang === 'ar' ? 'لايك بنترست' : lang === 'fr' ? 'Likes Pinterest' : lang === 'es' ? 'Me gusta de Pinterest' : 'Pinterest Likes', icon: ThumbsUp },
             { id: 'tg_join', label: lang === 'ar' ? 'اشتراك تليجرام' : lang === 'fr' ? 'S\'Abonner Telegram' : lang === 'es' ? 'Seguir Telegram' : 'Telegram Subs', icon: Send },
             { id: 'ad', label: lang === 'ar' ? 'إعلان' : lang === 'fr' ? 'Créer' : lang === 'es' ? 'Lanzar' : 'Campaign', icon: Sparkles },
+            { id: 'daily_bonus', label: lang === 'ar' ? 'مكافأة' : lang === 'fr' ? 'Bonus' : lang === 'es' ? 'Bono' : 'Bonus', icon: Gift },
             { id: 'buy', label: lang === 'ar' ? 'شراء' : lang === 'fr' ? 'Acheter' : lang === 'es' ? 'Comprar' : 'Buy', icon: Coins },
             { id: 'exchange', label: lang === 'ar' ? 'تبديل النقاط' : 'Exchange', icon: Coins },
             { id: 'settings', label: lang === 'ar' ? 'الإعدادات' : 'Settings', icon: Sliders },
@@ -836,6 +851,7 @@ export default function App() {
               {activeTab === 'pinterest_follow' && (lang === 'ar' ? 'تبادل متابعات واشتراكات حسابات وألواح بنترست لشهرة سريعة' : 'Exchange Pinterest follows and pins board subscriptions')}
               {activeTab === 'tg_join' && translations[lang].headerTgJoinExchange}
               {activeTab === 'ad' && translations[lang].headerAdSetup}
+              {activeTab === 'daily_bonus' && (lang === 'ar' ? 'المكافأة اليومية المجانية (1,000 نقطة)' : 'Free Daily Bonus (1,000 Points)')}
               {activeTab === 'buy' && translations[lang].headerBuyPoints}
               {activeTab === 'exchange' && (lang === 'ar' ? 'تبديل النقاط وسحب الأرباح النقدية كاش' : 'Exchange Points & USD Cash Out')}
               {activeTab === 'settings' && (lang === 'ar' ? 'إعدادات الحساب الشخصي والملف' : 'Account Settings & Credentials')}

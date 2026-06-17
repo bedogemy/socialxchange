@@ -1,10 +1,110 @@
 // public/vanilla/router.js
-// Clean client-side SPA router with Route Guards and header synchronization
+// Advanced Client-Side SPA Router & Reactive State Engine
+// Created by Senior Frontend Architect for maximum performance, DOM caching, and fluid transitions.
 
 import { renderLogin, checkAuthState } from './login.js';
 import { renderDashboard } from './dashboard.js';
 import { renderControlRoom } from './control-room.js';
 
+// ==========================================
+// 1. REACTIVE GLOBAL STATE MANAGEMENT
+// ==========================================
+class VanillaStateStore {
+  constructor() {
+    this.state = {
+      points: 0,
+      tasksCompletedToday: 0,
+      user: null
+    };
+    this.listeners = new Map();
+    this.initFromStorage();
+  }
+
+  // Load initial values from localStorage safely
+  initFromStorage() {
+    const localUserStr = localStorage.getItem('vanilla_user');
+    if (localUserStr) {
+      try {
+        const user = JSON.parse(localUserStr);
+        this.state.user = user;
+        this.state.points = user.points || 0;
+        this.state.tasksCompletedToday = parseInt(localStorage.getItem('tasksCompletedToday') || '0', 10);
+      } catch (e) {
+        console.warn('Could not initialize state from storage:', e);
+      }
+    }
+  }
+
+  // Retrieve current value
+  get(key) {
+    return this.state[key];
+  }
+
+  // Update a key and notify all active listeners
+  set(key, value) {
+    const stringifiedNew = JSON.stringify(value);
+    const stringifiedOld = JSON.stringify(this.state[key]);
+
+    if (stringifiedNew !== stringifiedOld) {
+      this.state[key] = value;
+      this.notify(key, value);
+      
+      // Keep localStorage in sync for consistency with legacy scripts
+      if (key === 'points' && this.state.user) {
+        this.state.user.points = value;
+        localStorage.setItem('vanilla_user', JSON.stringify(this.state.user));
+      }
+      if (key === 'user') {
+        if (value) {
+          localStorage.setItem('vanilla_user', JSON.stringify(value));
+        } else {
+          localStorage.removeItem('vanilla_user');
+        }
+      }
+      if (key === 'tasksCompletedToday') {
+        localStorage.setItem('tasksCompletedToday', value.toString());
+      }
+    }
+  }
+
+  // Register state change listener (returns unsubscribe handler)
+  subscribe(key, callback) {
+    if (!this.listeners.has(key)) {
+      this.listeners.set(key, []);
+    }
+    this.listeners.get(key).push(callback);
+    
+    // Call immediately with current value to populate screen components
+    if (this.state[key] !== undefined) {
+      callback(this.state[key]);
+    }
+
+    return () => {
+      const list = this.listeners.get(key) || [];
+      this.listeners.set(key, list.filter(cb => cb !== callback));
+    };
+  }
+
+  // Broadcast update to subscribers
+  notify(key, value) {
+    const list = this.listeners.get(key) || [];
+    list.forEach(callback => {
+      try {
+        callback(value);
+      } catch (err) {
+        console.error(`State notify error for "${key}":`, err);
+      }
+    });
+  }
+}
+
+// Instantiate and expose state globally
+export const vanillaState = new VanillaStateStore();
+window.vanillaState = vanillaState;
+
+// ==========================================
+// 2. HIGH-PERFORMANCE DOM-CACHING ROUTER
+// ==========================================
 class VanillaRouter {
   constructor() {
     this.routes = {
@@ -15,31 +115,76 @@ class VanillaRouter {
     
     this.appContainer = document.getElementById('app');
     
-    // View Caching system (Map) and Prefetch tracker
+    // Core Caching system (Stores real rendered HTMLElement containers instead of flat strings)
     this.cache = new Map();
-    this.prefetchedKeys = new Set();
+    this.currentContainer = null;
 
-    // Bind navigation handlers: Trigger routing as soon as DOM is parsed
-    window.addEventListener('hashchange', () => this.handleRouting());
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        this.handleRouting();
-        this.syncHeader();
-      });
-    } else {
-      this.handleRouting();
-      this.syncHeader();
-    }
-
-    // Listen for custom state change events from login/transaction actions
-    window.addEventListener('vanilla_auth_state_changed', () => {
-      // Clear cache on authentication change to ensure updated values load freshly
-      this.cache.clear();
-      this.prefetchedKeys.clear();
-      this.syncHeader();
-    });
+    // Listen to history popstate back/forward triggers
+    window.addEventListener('popstate', () => this.handleRouting());
     
-    // Bind Log Out button
+    // Listen for custom authentication dispatch flags
+    window.addEventListener('vanilla_auth_state_changed', () => {
+      // Clear view cache fully on sign-in status changes to prevent data leak views
+      this.wipeCache();
+      vanillaState.initFromStorage();
+      this.handleRouting();
+    });
+
+    // Intercept relative link navigations and translate them programmatically
+    this.setupIntercepts();
+  }
+
+  // Wipe view elements memory
+  wipeCache() {
+    this.cache.forEach(container => {
+      if (container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+    });
+    this.cache.clear();
+    this.currentContainer = null;
+  }
+
+  // Register public access routes dynamically
+  registerRoute(path, renderCallback) {
+    this.routes[path] = renderCallback;
+  }
+
+  // Catch both standard relative anchors/buttons and history flows
+  setupIntercepts() {
+    // 1. Absolute mouse clicks interceptor
+    document.addEventListener('click', (e) => {
+      const anchor = e.target.closest('a');
+      if (!anchor) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href) return;
+
+      // Ignore absolute external protocols
+      if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+        return;
+      }
+
+      // Route cleaner fallback matches
+      if (href.startsWith('#/')) {
+        e.preventDefault();
+        this.navigate(href.substring(1));
+      } else if (href.startsWith('/')) {
+        e.preventDefault();
+        this.navigate(href);
+      }
+    });
+
+    // 2. Click link button actions with specific onclick listeners
+    document.addEventListener('mouseover', (e) => {
+      const hoverTarget = e.target.closest('[data-route], [onclick*="router.navigate"]');
+      if (!hoverTarget) return;
+
+      // Pre-add hover class for slick native button states if desired
+      hoverTarget.style.cursor = 'pointer';
+    });
+
+    // 3. Keep nav-logout button synced
     const logoutBtn = document.getElementById('nav-logout');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', (e) => {
@@ -48,92 +193,201 @@ class VanillaRouter {
       });
     }
 
-    // Enable intelligent Hover Prefetching
-    this.setupHoverPrefetching();
-  }
-
-  // Generates safe unique keys for storage caching
-  getCacheKey(path, params) {
-    return params && Object.keys(params).length > 0
-      ? `${path}?${JSON.stringify(params)}`
-      : path;
-  }
-
-  // Delegate mouseover events to catch all link highlights and prefetch them instantly
-  setupHoverPrefetching() {
-    document.addEventListener('mouseover', (e) => {
-      const element = e.target.closest('a, button, [onclick], [data-route]');
-      if (!element) return;
-
-      let path = '';
-      let params = null;
-
-      // Extract target paths from standard links
-      if (element.tagName === 'A') {
-        const href = element.getAttribute('href') || '';
-        if (href.startsWith('#/')) {
-          path = href.substring(1);
-        }
-      } 
-      // Extract target paths from router click bindings
-      else {
-        const onclickAttr = element.getAttribute('onclick') || '';
-        if (onclickAttr.includes('router.navigate')) {
-          const match = onclickAttr.match(/router\.navigate\(\s*['"]([^'"]+)['"]\s*(?:,\s*(\{.*?\}))?\s*\)/);
-          if (match) {
-            path = match[1];
-            if (match[2]) {
-              try {
-                // Safely format parameters back to JSON format
-                const rawParamsStr = match[2].replace(/'/g, '"');
-                params = JSON.parse(rawParamsStr);
-              } catch (err) {
-                console.warn('Prefetch key processing error:', err);
-              }
-            }
-          }
-        }
+    // 4. Connect Reactive state indicators directly to header elements
+    vanillaState.subscribe('points', (points) => {
+      const pointsIndicator = document.getElementById('nav-points');
+      if (pointsIndicator) {
+        pointsIndicator.innerText = Number(points || 0).toLocaleString();
       }
+    });
 
-      const cleanPath = path.split('?')[0];
-      if (cleanPath && this.routes[cleanPath]) {
-        this.prefetch(cleanPath, params);
+    vanillaState.subscribe('user', (user) => {
+      const headerContainer = document.getElementById('nav-user-container');
+      if (headerContainer) {
+        if (user) {
+          headerContainer.classList.remove('hidden');
+          headerContainer.classList.add('flex');
+        } else {
+          headerContainer.classList.add('hidden');
+          headerContainer.classList.remove('flex');
+        }
       }
     });
   }
 
-  // Backdoor cache loader running background tasks on mouseenter
-  async prefetch(path, params) {
-    const cacheKey = this.getCacheKey(path, params);
-    if (this.cache.has(cacheKey) || this.prefetchedKeys.has(cacheKey)) {
-      return; // Already preloaded
+  // Parse path based on URL subpath paths safely (e.g. support /vanilla subfolders)
+  getRoutePath() {
+    const base = window.location.pathname.startsWith('/vanilla') ? '/vanilla' : '';
+    let relativePath = window.location.pathname;
+
+    if (base && relativePath.startsWith(base)) {
+      relativePath = relativePath.substring(base.length);
     }
 
-    this.prefetchedKeys.add(cacheKey);
-    console.log(`[Smart Prefetch] Hover detected! Preloading "${path}" ahead of click...`);
+    // Default route mapping
+    if (relativePath === '/' || relativePath === '/index.html' || relativePath === '') {
+      relativePath = '/dashboard';
+    }
 
-    try {
-      const renderComponent = this.routes[path];
-      if (renderComponent) {
-        const tempContainer = document.createElement('div');
-        await renderComponent(tempContainer, params);
-        
-        // Cache visual output structure
-        this.cache.set(cacheKey, tempContainer.innerHTML);
-        console.log(`[Smart Prefetch] Cached route "${cacheKey}" to 0ms local state.`);
+    // Fallback hash check for deep-links matching backward compatibility
+    if (window.location.hash.startsWith('#/')) {
+      const parts = window.location.hash.substring(1).split('?');
+      relativePath = parts[0];
+    }
+
+    // Match query variables
+    const urlParams = new URLSearchParams(window.location.search);
+    const params = {};
+    for (const [key, value] of urlParams.entries()) {
+      try {
+        params[key] = JSON.parse(value);
+      } catch (err) {
+        params[key] = value;
       }
-    } catch (e) {
-      this.prefetchedKeys.delete(cacheKey);
-      console.warn('Prefetch process aborted:', e);
     }
+
+    return {
+      path: relativePath,
+      params
+    };
   }
 
-  // Return elegant customized Skeleton Screens for premium page load states
+  // Central Dispatcher routing logic
+  async handleRouting() {
+    const { path, params } = this.getRoutePath();
+    const isUserAuthenticated = checkAuthState();
+    const isProtectedRoute = (path === '/dashboard' || path === '/control-room');
+
+    // ROUTE GUARDS (حماية حيوية للمسارات)
+    if (isProtectedRoute && !isUserAuthenticated) {
+      console.log(`[Router Guard] Route "${path}" is protected. Re-routing client to /login`);
+      this.navigate('/login');
+      return;
+    }
+    
+    if (path === '/login' && isUserAuthenticated) {
+      console.log('[Router Guard] Authorized user session detected. Auto-forwarding to /dashboard');
+      this.navigate('/dashboard');
+      return;
+    }
+
+    const renderComponent = this.routes[path];
+    if (!renderComponent) {
+      this.render404();
+      return;
+    }
+
+    // Generate specific caching key containing serializations
+    const cacheKey = path + (Object.keys(params).length ? `?${JSON.stringify(params)}` : '');
+
+    // Get or create route views container securely
+    let targetContainer = this.cache.get(cacheKey);
+    const isNewNode = !targetContainer;
+
+    if (isNewNode) {
+      targetContainer = document.createElement('div');
+      targetContainer.id = `view-${path.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      targetContainer.className = 'w-full hidden';
+      this.appContainer.appendChild(targetContainer);
+      this.cache.set(cacheKey, targetContainer);
+    }
+
+    // Transition Handler: Animate previous container fading out smoothly
+    const previousContainer = this.currentContainer;
+
+    if (previousContainer && previousContainer !== targetContainer) {
+      previousContainer.classList.remove('fade-in');
+      previousContainer.classList.add('fade-out');
+      
+      // Let animation fade out conclude fully before display toggling
+      await new Promise(resolve => setTimeout(resolve, 180));
+      previousContainer.style.display = 'none';
+      previousContainer.classList.remove('fade-out');
+    }
+
+    // Populate layout if newly loaded or refresh data
+    this.currentContainer = targetContainer;
+    targetContainer.style.display = 'block';
+    
+    if (isNewNode) {
+      // First-visit load: show immediate elegant loading skeleton
+      targetContainer.innerHTML = this.getSkeletonUI(path);
+      if (window.lucide) window.lucide.createIcons();
+
+      try {
+        // Render view component dynamically
+        const freshRenderDiv = document.createElement('div');
+        await renderComponent(freshRenderDiv, params);
+        
+        targetContainer.innerHTML = freshRenderDiv.innerHTML;
+        if (window.lucide) window.lucide.createIcons();
+      } catch (err) {
+        targetContainer.innerHTML = `
+          <div class="max-w-md mx-auto bg-slate-900 border border-rose-500/15 p-6 rounded-2xl text-center space-y-4 shadow-2xl">
+            <i data-lucide="alert-octagon" class="w-12 h-12 text-rose-500 mx-auto animate-bounce"></i>
+            <h3 class="text-md font-bold text-white">فشل تحميل واجهة الصفحة</h3>
+            <p class="text-xs text-slate-400">${err.message || 'عذراً، حدث خطأ داخلي في العرض.'}</p>
+          </div>
+        `;
+        if (window.lucide) window.lucide.createIcons();
+      }
+    } else {
+      // SWR (Stale-While-Revalidate): render instantly from DOM cache, then update in background!
+      setTimeout(async () => {
+        try {
+          const freshRenderDiv = document.createElement('div');
+          await renderComponent(freshRenderDiv, params);
+          
+          // Re-validate view data if user is still actively staying on the same screen
+          if (this.currentContainer === targetContainer) {
+            targetContainer.innerHTML = freshRenderDiv.innerHTML;
+            if (window.lucide) window.lucide.createIcons();
+          }
+        } catch (e) {
+          console.warn('[View Cache] Background state poll deferred:', e);
+        }
+      }, 50);
+    }
+
+    // Trigger visual fade-in animation
+    targetContainer.classList.add('fade-in');
+  }
+
+  // Push clean URL route programmatically without full screen re-render
+  navigate(path, params = null) {
+    const base = window.location.pathname.startsWith('/vanilla') ? '/vanilla' : '';
+    let targetUrl = base + path;
+
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.keys(params).forEach(key => {
+        searchParams.set(key, JSON.stringify(params[key]));
+      });
+      targetUrl += '?' + searchParams.toString();
+    }
+
+    // Set fallback hash dynamically to support direct bookmarks and deep linkages
+    window.location.hash = `#${path}`;
+
+    // Push clean path states to History
+    window.history.pushState({ path, params }, '', targetUrl);
+    this.handleRouting();
+  }
+
+  // Clear token and logout
+  logout() {
+    localStorage.removeItem('vanilla_user');
+    vanillaState.set('user', null);
+    vanillaState.set('points', 0);
+    this.wipeCache();
+    this.navigate('/login');
+  }
+
+  // Return customized Skeleton Screens matching layout specs
   getSkeletonUI(path) {
     if (path === '/dashboard') {
       return `
         <div class="space-y-8 animate-pulse text-right" dir="rtl">
-          <!-- Welcome Bar Skeleton -->
           <div class="sm:flex sm:items-center sm:justify-between bg-slate-900/40 p-6 rounded-2xl border border-slate-800/40">
             <div class="flex items-center gap-4">
               <div class="w-12 h-12 rounded-xl bg-slate-800 skeleton-glow"></div>
@@ -145,16 +399,13 @@ class VanillaRouter {
             <div class="h-8 w-32 bg-slate-800 rounded-xl mt-4 sm:mt-0 skeleton-glow"></div>
           </div>
 
-          <!-- Points and Analytics Info Grid Skeletons -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-slate-900/40 p-8 rounded-3xl border border-slate-800/40 min-h-[220px] flex flex-col justify-between">
               <div class="space-y-2">
                 <div class="h-3.5 w-28 bg-slate-800 rounded skeleton-glow"></div>
                 <div class="h-4 w-20 bg-slate-800 rounded skeleton-glow"></div>
               </div>
-              <div class="space-y-2">
-                <div class="h-9 w-40 bg-slate-800 rounded skeleton-glow"></div>
-              </div>
+              <div class="h-9 w-40 bg-slate-800 rounded skeleton-glow"></div>
               <div class="h-3 w-32 bg-slate-800 rounded skeleton-glow"></div>
             </div>
 
@@ -169,18 +420,6 @@ class VanillaRouter {
                   <div class="h-10 bg-slate-800/45 rounded-xl skeleton-glow"></div>
                 </div>
               </div>
-              <div class="h-10 w-48 bg-slate-800 rounded-xl self-end mt-4 skeleton-glow"></div>
-            </div>
-          </div>
-
-          <!-- Services grid Skeletons -->
-          <div class="space-y-4">
-            <div class="h-5 w-48 bg-slate-800 rounded skeleton-glow"></div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
-              <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
-              <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
-              <div class="h-48 bg-slate-900/40 border border-slate-800/40 rounded-2xl skeleton-glow"></div>
             </div>
           </div>
         </div>
@@ -189,7 +428,7 @@ class VanillaRouter {
 
     if (path === '/control-room') {
       return `
-        <div class="max-w-4xl mx-auto space-y-8 animate-pulse text-right shadow-sm" dir="rtl">
+        <div class="max-w-4xl mx-auto space-y-8 animate-pulse text-right" dir="rtl">
           <div class="h-4.5 w-32 bg-slate-800 rounded skeleton-glow"></div>
           <div class="space-y-2">
             <div class="h-6 w-64 bg-slate-800 rounded skeleton-glow"></div>
@@ -198,229 +437,30 @@ class VanillaRouter {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div class="md:col-span-2 space-y-6">
               <div class="bg-slate-900/40 border border-slate-800/40 p-6 rounded-2xl space-y-4">
-                <div class="h-4 w-44 bg-slate-800 rounded skeleton-glow"></div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div class="h-16 bg-slate-800/60 rounded-xl skeleton-glow"></div>
-                  <div class="h-16 bg-slate-800/60 rounded-xl skeleton-glow"></div>
-                  <div class="h-16 bg-slate-800/60 rounded-xl skeleton-glow"></div>
-                  <div class="h-16 bg-slate-800/60 rounded-xl skeleton-glow"></div>
-                </div>
-                <div class="h-12 w-full bg-slate-800/60 rounded-xl skeleton-glow"></div>
+                <div class="h-16 bg-slate-800/60 rounded-xl skeleton-glow"></div>
               </div>
             </div>
-            <div class="md:col-span-1 bg-slate-900/40 border border-slate-800/40 p-6 rounded-2xl h-80 skeleton-glow"></div>
           </div>
         </div>
       `;
     }
 
-    // Default Fallback circular loader
+    // Default Spinner loader
     return `
-      <div class="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-pulse">
+      <div class="flex flex-col items-center justify-center min-h-[40vh] space-y-4">
         <div class="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-        <p class="text-xs text-slate-400 font-semibold tracking-wider">جاري مزامنة بيانات الصفحة من السيرفر الآمن...</p>
+        <p class="text-xs text-slate-400 font-semibold">جاري مزامنة بيانات الصفحة من السيرفر الآمن...</p>
       </div>
     `;
   }
 
-  // Parse path from Hash to support deep-linking naturally without server 404s
-  getRoutePath() {
-    const hash = window.location.hash || '#/dashboard';
-    const path = hash.substring(1); // Strips the '#' character
-    
-    // Separate queries if routed with extra parameters passed as serialized JSON or parameters
-    const [cleanPath, queryStr] = path.split('?');
-    let params = {};
-    
-    if (queryStr) {
-      try {
-        params = JSON.parse(decodeURIComponent(queryStr));
-      } catch (e) {
-        console.warn('Could not parse route params:', e);
-      }
-    }
-    
-    return {
-      path: cleanPath || '/dashboard',
-      params
-    };
-  }
-
-  // Main execution route handler with transitions, SWR Caching, and Skeletons
-  async handleRouting() {
-    const { path, params } = this.getRoutePath();
-    const isUserAuthenticated = checkAuthState();
-    
-    // Protected routes listing
-    const isProtectedRoute = (path === '/dashboard' || path === '/control-room');
-
-    // ==========================================
-    // ROUTE GUARDS (حماية المسارات والدخول الموثق)
-    // ==========================================
-    if (isProtectedRoute && !isUserAuthenticated) {
-      console.log('Route Guard: User unauthorized. Redirecting to /login');
-      this.navigate('/login');
-      return;
-    }
-    
-    if (path === '/login' && isUserAuthenticated) {
-      console.log('Route Guard: Already logged in. Redirecting to /dashboard');
-      this.navigate('/dashboard');
-      return;
-    }
-
-    // Identify target component function
-    const renderComponent = this.routes[path];
-    
-    if (!renderComponent) {
-      this.render404();
-      return;
-    }
-
-    // Generate unique caching key
-    const cacheKey = this.getCacheKey(path, params);
-
-    // 1. Core Transition Mechanics: Apply gorgeous fade-out beforehand
-    if (this.appContainer.children.length > 0) {
-      this.appContainer.classList.remove('fade-in');
-      this.appContainer.classList.add('fade-out');
-      // Match the CSS animation duration perfectly
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-
-    this.appContainer.classList.remove('fade-out');
-    this.appContainer.classList.add('fade-in');
-
-    // 2. Local State View Caching (Stale-While-Revalidate Engine)
-    const cachedHTML = this.cache.get(cacheKey);
-
-    if (cachedHTML) {
-      console.log(`[View Cache] Rendering cached content instantly (0ms) for "${cacheKey}"...`);
-      // Update DOM with cached data first
-      this.appContainer.innerHTML = cachedHTML;
-      if (window.lucide) window.lucide.createIcons();
-
-      // Background Validation: Re-execute in the background to ensure data stays fully up-to-date
-      setTimeout(async () => {
-        try {
-          const freshDiv = document.createElement('div');
-          await renderComponent(freshDiv, params);
-          
-          this.cache.set(cacheKey, freshDiv.innerHTML);
-
-          // If the user has NOT changed routes during background execution, update DOM seamlessly
-          const activeRoute = this.getRoutePath();
-          if (this.getCacheKey(activeRoute.path, activeRoute.params) === cacheKey) {
-            // Check if there are active inputs (prevent input interruption)
-            const focusedEl = document.activeElement;
-            const activeInputStates = Array.from(this.appContainer.querySelectorAll('input, textarea, select')).map(input => ({
-              id: input.id,
-              value: input.value,
-              isFocused: input === focusedEl
-            }));
-
-            this.appContainer.innerHTML = freshDiv.innerHTML;
-
-            // Retouch input states to guarantee flawless user form editing
-            activeInputStates.forEach(state => {
-              if (state.id) {
-                const refreshedEl = this.appContainer.querySelector(`#${state.id}`);
-                if (refreshedEl) {
-                  refreshedEl.value = state.value;
-                  if (state.isFocused) refreshedEl.focus();
-                }
-              }
-            });
-
-            if (window.lucide) window.lucide.createIcons();
-          }
-        } catch (err) {
-          console.warn('[View Cache] Background state updates deferred:', err);
-        }
-      }, 100);
-
-    } else {
-      // 3. New Screen Skeleton Rendering Framework
-      console.log(`[Skeleton Loader] Loading first-visit state for "${path}"...`);
-      this.appContainer.innerHTML = this.getSkeletonUI(path);
-      if (window.lucide) window.lucide.createIcons();
-
-      // Fetch, build, and render freshest elements dynamically from backend
-      try {
-        const freshRenderDiv = document.createElement('div');
-        await renderComponent(freshRenderDiv, params);
-
-        // Update main viewport frame
-        this.appContainer.innerHTML = freshRenderDiv.innerHTML;
-        
-        // Cache visual output structure
-        this.cache.set(cacheKey, freshRenderDiv.innerHTML);
-        if (window.lucide) window.lucide.createIcons();
-
-      } catch (err) {
-        this.appContainer.innerHTML = `
-          <div class="max-w-md mx-auto bg-slate-900 border border-rose-500/15 p-6 rounded-2xl text-center space-y-4">
-            <i data-lucide="alert-octagon" class="w-12 h-12 text-rose-500 mx-auto animate-bounce"></i>
-            <h3 class="text-md font-bold text-white">فشل تحميل واجهة الصفحة</h3>
-            <p class="text-xs text-slate-400">${err.message || 'عذراً، حدث خطأ داخلي في العرض.'}</p>
-          </div>
-        `;
-        if (window.lucide) window.lucide.createIcons();
-      }
-    }
-
-    // Keep active header elements synchronized
-    this.syncHeader();
-  }
-
-  // Pure navigational router push with optional parameters
-  navigate(path, params = null) {
-    let targetHash = `#${path}`;
-    if (params) {
-      targetHash += `?${encodeURIComponent(JSON.stringify(params))}`;
-    }
-    window.location.hash = targetHash;
-  }
-
-  // Sync Header Bar point visual indicator and show/hide controls
-  syncHeader() {
-    const localUserStr = localStorage.getItem('vanilla_user');
-    const headerContainer = document.getElementById('nav-user-container');
-    const pointsIndicator = document.getElementById('nav-points');
-
-    if (localUserStr) {
-      try {
-        const user = JSON.parse(localUserStr);
-        if (headerContainer && pointsIndicator) {
-          pointsIndicator.innerText = (user.points || 0).toLocaleString();
-          headerContainer.classList.remove('hidden');
-          headerContainer.classList.add('flex');
-        }
-      } catch (e) {
-        localStorage.removeItem('vanilla_user');
-      }
-    } else {
-      if (headerContainer) {
-        headerContainer.classList.add('hidden');
-        headerContainer.classList.remove('flex');
-      }
-    }
-  }
-
-  // Clear session and wipe tokens on Log Out
-  logout() {
-    localStorage.removeItem('vanilla_user');
-    this.syncHeader();
-    this.navigate('/login');
-  }
-
-  // Standard 404 view markup
+  // 404 handler
   render404() {
     this.appContainer.innerHTML = `
-      <div class="text-center py-20 space-y-6">
+      <div class="text-center py-20 space-y-6 fade-in" dir="rtl">
         <i data-lucide="compass" class="w-16 h-16 text-indigo-400 mx-auto animate-spin"></i>
         <h2 class="text-3xl font-black text-white">404 - الصفحة غير موجودة</h2>
-        <p class="text-xs text-slate-400">يبدو أنك سلكت مساراً خاطئاً في التوجيه.</p>
+        <p class="text-xs text-slate-400">يبدو أنك سلكت مساراً غير مدعوم في منصتنا.</p>
         <button onclick="window.router.navigate('/dashboard')" class="bg-indigo-650 hover:bg-indigo-750 text-white font-extrabold text-xs px-6 py-2.5 rounded-xl transition duration-150">
           العودة للوحة القيادة العامة
         </button>
@@ -430,6 +470,6 @@ class VanillaRouter {
   }
 }
 
-// Instantiate and expose router globally so SPA modules can call methods freely
+// Instantiate and expose router globally
 window.router = new VanillaRouter();
 export default window.router;

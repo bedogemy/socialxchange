@@ -730,6 +730,150 @@ async function startServer() {
     }
   });
 
+  // Local Emulation for Netlify Function: daily-bonus.js
+  app.post('/.netlify/functions/daily-bonus', async (req, res) => {
+    try {
+      const { email, action, userId } = req.body;
+
+      let targetUserId = '';
+      if (userId) {
+        targetUserId = userId;
+      } else if (email) {
+        const normalizedEmail = email.toLowerCase().trim();
+        targetUserId = `vanilla_${normalizedEmail}`;
+      } else {
+        return res.status(400).json({ error: 'البريد الإلكتروني أو معرف المستخدم (userId) مطلوب لتنفيذ هذا الإجراء.' });
+      }
+
+      // Compute central date parameters (UTC YYYY-MM-DD)
+      const serverDate = new Date();
+      const todayStr = serverDate.toISOString().split('T')[0];
+      const nowTimestamp = Date.now();
+
+      // Dynamic load firebase configurations
+      const fs = await import('fs');
+      const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+      const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+      const { initializeApp: serverInitApp, getApp: serverGetApp } = await import('firebase/app');
+      const { getFirestore: serverGetFirestore, doc: serverDoc, getDoc: serverGetDoc, updateDoc: serverUpdateDoc, increment: serverIncrement } = await import('firebase/firestore');
+
+      let fbApp;
+      try {
+        fbApp = serverGetApp('server-daily-bonus');
+      } catch (e) {
+        fbApp = serverInitApp(firebaseConfig, 'server-daily-bonus');
+      }
+      const firestoreDb = serverGetFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+
+      const userDocRef = serverDoc(firestoreDb, 'users', targetUserId);
+      const docSnap = await serverGetDoc(userDocRef);
+
+      if (!docSnap.exists()) {
+        return res.status(404).json({ error: 'المستخدم غير مسجل بالنظام.' });
+      }
+
+      const userData = docSnap.data();
+
+      let tasksCompletedToday = typeof userData.tasksCompletedToday === 'number' ? userData.tasksCompletedToday : 0;
+      let lastTaskDate = userData.lastTaskDate || '';
+      let lastBonusClaimed = userData.lastBonusClaimed || 0;
+      let points = typeof userData.points === 'number' ? userData.points : 1000;
+
+      // Check if a new day has arrived relative to server clock
+      if (lastTaskDate !== todayStr) {
+        tasksCompletedToday = 0;
+        lastTaskDate = todayStr;
+
+        await serverUpdateDoc(userDocRef, {
+          tasksCompletedToday: 0,
+          lastTaskDate: todayStr
+        });
+      }
+
+      // Action A: Get Status
+      if (action === 'get_status') {
+        const msSinceLastClaim = nowTimestamp - lastBonusClaimed;
+        const hoursToWaitNum = 24;
+        const canClaimBonusTime = lastBonusClaimed === 0 || msSinceLastClaim >= hoursToWaitNum * 60 * 60 * 1000;
+        const timeRemainingMs = Math.max(0, (hoursToWaitNum * 60 * 60 * 1000) - msSinceLastClaim);
+
+        return res.json({
+          success: true,
+          points,
+          tasksCompletedToday,
+          lastTaskDate,
+          lastBonusClaimed,
+          canClaimBonusTime,
+          timeRemainingMs,
+          today: todayStr,
+          requiredTasks: 50
+        });
+      }
+
+      // Action B: Complete Task
+      if (action === 'complete_task') {
+        const incrementVal = 1;
+        const newTasksCompletedToday = tasksCompletedToday + incrementVal;
+
+        await serverUpdateDoc(userDocRef, {
+          tasksCompletedToday: serverIncrement(incrementVal),
+          lastTaskDate: todayStr
+        });
+
+        return res.json({
+          success: true,
+          message: 'تم تسجيل إنجاز المهمة الترويجية بنجاح بنظام المكافآت.',
+          tasksCompletedToday: newTasksCompletedToday,
+          today: todayStr
+        });
+      }
+
+      // Action C: Claim Bonus
+      if (action === 'claim_bonus') {
+        const taskThreshold = 50;
+        if (tasksCompletedToday < taskThreshold) {
+          return res.status(400).json({
+            error: `لم تكمل شروط المكافأة اليومية بعد. لقد أنجزت ${tasksCompletedToday} مهمة فقط اليوم، تتبقى لك ${taskThreshold - tasksCompletedToday} من المهام المطلوبة لتفعيل فرصة سحب الـ 1000 نقطة.`
+          });
+        }
+
+        const hoursToWaitNum = 24;
+        const msSinceLastClaim = nowTimestamp - lastBonusClaimed;
+        if (lastBonusClaimed !== 0 && msSinceLastClaim < hoursToWaitNum * 60 * 60 * 1000) {
+          const remainingMs = (hoursToWaitNum * 60 * 60 * 1000) - msSinceLastClaim;
+          const remHours = Math.floor(remainingMs / (60 * 60 * 1000));
+          const remMinutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+
+          return res.status(400).json({
+            error: `عذراً، لقد استلمت مكافأتك اليومية بالفعل. تتبقى لك فترة انتظار: ${remHours} ساعة و ${remMinutes} دقيقة قبل السحب القادم.`
+          });
+        }
+
+        const rewardPoints = 1000;
+        const finalPoints = points + rewardPoints;
+
+        await serverUpdateDoc(userDocRef, {
+          points: serverIncrement(rewardPoints),
+          lastBonusClaimed: nowTimestamp
+        });
+
+        return res.json({
+          success: true,
+          message: 'مبارك! حصلت على جائزتك اليومية بقيمة 1000 نقطة مجانية بنجاح تم إيداعها بمحفظتك.',
+          newPoints: finalPoints,
+          lastBonusClaimed: nowTimestamp
+        });
+      }
+
+      return res.status(400).json({ error: 'العملية المطلوبة غير صحيحة.' });
+
+    } catch (err: any) {
+      console.error('Error in local daily-bonus simulation:', err);
+      return res.status(500).json({ error: 'حدث خطأ غير متوقع أثناء معالجة المكافأة اليومية بالنظام: ' + err.message });
+    }
+  });
+
   // Serve Vite in development, static files in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

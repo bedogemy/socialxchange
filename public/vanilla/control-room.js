@@ -237,6 +237,33 @@ export function renderControlRoom(container, params = {}) {
           };
           localStorage.setItem('vanilla_user', JSON.stringify(updatedLocalUser));
           
+          // زيادة عداد المهام يدويًا في المتصفح لتحديث الحسبة أمام العضو فورًا
+          let completed = parseInt(localStorage.getItem('tasksCompletedToday') || 0);
+          completed++;
+          localStorage.setItem('tasksCompletedToday', completed);
+
+          // ثم استدعاء دالة تحديث خانة البونص لعرض الأرقام الجديدة
+          if (window.updateBonusUI) {
+            window.updateBonusUI(completed);
+          }
+
+          // تسجيل إنجاز المهمة في السيرفر لضمان الأمان ومزامنة قاعدة البيانات
+          try {
+            fetch('/.netlify/functions/daily-bonus', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                userId: `vanilla_${currentUser.email.toLowerCase().trim()}`,
+                email: currentUser.email,
+                action: 'complete_task'
+              })
+            }).catch(e => console.error('Silent task sync failure:', e));
+          } catch (taskErr) {
+            console.error('Failed to sync complete_task on the server:', taskErr);
+          }
+
           // Re-update the active reference state in memory
           currentUser.points = data.newPoints;
 
