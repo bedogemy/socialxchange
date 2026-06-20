@@ -22,8 +22,8 @@
   <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
 
   <!-- Preload Critical JS files so they download in parallel while rendering the shell -->
-  <link rel="preload" href="./router.js" as="script" crossorigin="anonymous">
-  <link rel="preload" href="./dashboard.js" as="script" crossorigin="anonymous">
+  <link rel="preload" href="/vanilla/router.js" as="script" crossorigin="anonymous">
+  <link rel="preload" href="/vanilla/dashboard.js" as="script" crossorigin="anonymous">
   <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
 
   <!-- Tailwind CSS CDN -->
@@ -220,17 +220,17 @@
   </footer>
 
   <!-- Load Modules using type="module" -->
-  <script type="module" src="./login.js"></script>
-  <script type="module" src="./dashboard.js"></script>
-  <script type="module" src="./control-room.js"></script>
+  <script type="module" src="/vanilla/login.js"></script>
+  <script type="module" src="/vanilla/dashboard.js"></script>
+  <script type="module" src="/vanilla/control-room.js"></script>
   <!-- Load router last, linking our view modules -->
-  <script type="module" src="./router.js"></script>
+  <script type="module" src="/vanilla/router.js"></script>
 
   <!-- Service Worker Instant Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
+        navigator.serviceWorker.register('/vanilla/service-worker.js')
           .then((registration) => {
             console.log('[App] Service Worker successfully registered on scope:', registration.scope);
           })
